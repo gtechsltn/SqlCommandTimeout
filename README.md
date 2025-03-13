@@ -98,3 +98,67 @@ using (SqlBulkCopy bulkCopy = new SqlBulkCopy(connection))
     await bulkCopy.WriteToServerAsync(dataTable);
 }
 ```
+
+# Example: Using SqlDataReader with SequentialAccess for Large Exports
+```
+using (SqlConnection conn = new SqlConnection(connectionString))
+{
+    conn.Open();
+    using (SqlCommand cmd = new SqlCommand("SELECT LargeColumn FROM YourTable", conn))
+    {
+        cmd.CommandTimeout = 600; // Increase timeout for large exports (10 minutes)
+        
+        using (SqlDataReader reader = cmd.ExecuteReader(CommandBehavior.SequentialAccess))
+        {
+            while (reader.Read())
+            {
+                // Example: Reading a large text column sequentially
+                using (StreamWriter writer = new StreamWriter("exported_data.txt"))
+                {
+                    char[] buffer = new char[8192]; // Buffer size
+                    long bytesRead;
+                    long startIndex = 0;
+                    
+                    while ((bytesRead = reader.GetChars(0, startIndex, buffer, 0, buffer.Length)) > 0)
+                    {
+                        writer.Write(buffer, 0, (int)bytesRead);
+                        startIndex += bytesRead; // Move to the next chunk
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+## Why Use SequentialAccess?
+✅ Memory Efficiency: Prevents large binary or text fields from being fully loaded into memory.
+✅ Better Performance: Streams data efficiently for large exports like file writing or API responses.
+✅ Handles Large Blobs (Images, Files, XML, JSON, etc.)
+
+# Alternative: Exporting Large Data to CSV
+```
+using (SqlConnection conn = new SqlConnection(connectionString))
+{
+    conn.Open();
+    using (SqlCommand cmd = new SqlCommand("SELECT LargeColumn FROM YourTable", conn))
+    {
+        cmd.CommandTimeout = 600; // Increase timeout for large exports (10 minutes)
+        
+        using (SqlDataReader reader = cmd.ExecuteReader(CommandBehavior.SequentialAccess))
+        {
+            while (reader.Read())
+            {
+                // Example: Reading a large text column sequentially
+                using (StreamWriter writer = new StreamWriter("data_export.csv"))
+                {
+                    while (reader.Read())
+                    {
+                        writer.WriteLine($"{reader["Column1"]},{reader["Column2"]}");
+                    }
+                }
+            }
+        }
+    }
+}
+```
